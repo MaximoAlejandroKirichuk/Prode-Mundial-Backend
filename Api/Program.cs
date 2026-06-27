@@ -1,6 +1,9 @@
+using Api.Application.Abstractions.Notifications;
 using Api.Application.Abstractions.Payments;
 using Api.Application.Abstractions.Persistence;
 using Api.Application.UseCases.Registrations;
+using Api.Application.UseCases.Webhooks;
+using Api.Infrastructure.Notifications;
 using Api.Infrastructure.Payments;
 using Api.Infrastructure.Persistence;
 using Api.Infrastructure.Persistence.Repositories;
@@ -21,14 +24,24 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<IRegistrationRepository, RegistrationRepository>();
+builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
+builder.Services.AddScoped<IRegistrationPaymentRepository, RegistrationPaymentRepository>();
+builder.Services.AddScoped<IWebhookIdempotencyRepository, WebhookIdempotencyRepository>();
+builder.Services.AddScoped<IRegistrationAnomalyRepository, RegistrationAnomalyRepository>();
 
 // Payments
 builder.Services.Configure<MercadoPagoOptions>(
     builder.Configuration.GetSection(MercadoPagoOptions.SectionName));
 builder.Services.AddScoped<IMercadoPagoService, MercadoPagoService>();
 
+// Notifications
+builder.Services.Configure<ResendOptions>(
+    builder.Configuration.GetSection(ResendOptions.SectionName));
+builder.Services.AddScoped<IEmailService, ResendEmailService>();
+
 // Use Cases
 builder.Services.AddScoped<CreateRegistrationUseCase>();
+builder.Services.AddScoped<ProcessMercadoPagoWebhookUseCase>();
 
 var app = builder.Build();
 

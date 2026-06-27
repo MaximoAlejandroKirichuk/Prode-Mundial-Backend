@@ -6,6 +6,8 @@ public enum RegistrationStatus
     Paid = 1,
     Rejected = 2,
     InReview = 3,
-    PaidWithoutNotification = 4,
-    Notified = 5
+    PaidPendingNotification = 4,
+    Notified = 5,
+    Expired = 6,
+    ManualReview = 7
 }

@@ -1,6 +1,8 @@
 using Api.Application.Abstractions.Payments;
 using Api.Application.Abstractions.Persistence;
 using Api.Domain.Entities;
+using Api.Domain.Enums;
+using Api.Domain.Exceptions;
 
 namespace Api.Application.UseCases.Registrations;
 
@@ -9,15 +11,17 @@ public sealed record CreateRegistrationResult(
     string PaymentUrl,
     bool IsExisting);
 
-public sealed class CreateRegistrationUseCase(
-    IRegistrationRepository repository,
+public class CreateRegistrationUseCase(
+    IRegistrationRepository registrationRepository,
+    ITournamentRepository tournamentRepository,
     IMercadoPagoService mercadoPagoService)
 {
     private static readonly TimeSpan RecentWindow = TimeSpan.FromMinutes(5);
 
-    public async Task<CreateRegistrationResult> ExecuteAsync(
+    public virtual async Task<CreateRegistrationResult> ExecuteAsync(
         string name,
         string email,
+        Guid tournamentId,
         CancellationToken cancellationToken = default)
     {
         // Validate inputs at the application boundary
@@ -27,31 +31,58 @@ public sealed class CreateRegistrationUseCase(
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email is required.", nameof(email));
 
-        // Check for recent pending registration with same email (double-click guard)
-        var existing = await repository.GetRecentPendingByEmailAsync(
-            email, RecentWindow, cancellationToken);
+        if (tournamentId == Guid.Empty)
+            throw new ArgumentException("TournamentId is required.", nameof(tournamentId));
 
-        if (existing is not null && existing.PaymentUrl is not null)
+        // Validate tournament exists and is active
+        var tournament = await tournamentRepository.GetByIdAsync(tournamentId, cancellationToken);
+
+        if (tournament is null)
+            throw new TournamentNotFoundException(tournamentId);
+
+        if (!tournament.IsActive())
+            throw new TournamentNotActiveException(tournamentId);
+
+        // Enforce scoped duplicate policy (email, tournament_id)
+        var latest = await registrationRepository.GetLatestByEmailAndTournamentAsync(
+            email, tournamentId, cancellationToken);
+
+        if (latest is not null)
         {
-            return new CreateRegistrationResult(
-                existing.Id,
-                existing.PaymentUrl,
-                IsExisting: true);
+            switch (latest.Status)
+            {
+                // Block: already paid for this tournament
+                case RegistrationStatus.Paid:
+                case RegistrationStatus.Notified:
+                case RegistrationStatus.PaidPendingNotification:
+                    throw new DuplicatePaidRegistrationException(email, tournamentId);
+
+                // Reuse: recent pending checkout (< 5 min)
+                case RegistrationStatus.Pending
+                    when latest.CreatedAt >= DateTimeOffset.UtcNow - RecentWindow
+                    && latest.PaymentUrl is not null:
+                    return new CreateRegistrationResult(
+                        latest.Id,
+                        latest.PaymentUrl,
+                        IsExisting: true);
+
+                // Retry: rejected, expired, or stale pending → fall through to create new
+            }
         }
 
         // Create registration entity (not yet persisted)
-        var registration = new Registration(name, email);
+        var registration = new Registration(name, email, tournamentId);
 
         // Create payment preference via Mercado Pago
         var preference = await mercadoPagoService.CreatePreferenceAsync(
-            name, email, registration.Id.ToString(), cancellationToken);
+            name, email, tournament.PriceAmount, tournament.Currency, registration.Id.ToString(), cancellationToken);
 
         // Set payment data on the entity
         registration.SetPaymentPreference(preference.PreferenceId, preference.PaymentUrl);
 
         // Persist ONLY after successful payment preference creation
-        await repository.AddAsync(registration, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
+        await registrationRepository.AddAsync(registration, cancellationToken);
+        await registrationRepository.SaveChangesAsync(cancellationToken);
 
         return new CreateRegistrationResult(
             registration.Id,

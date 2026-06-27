@@ -1,0 +1,39 @@
+# openspec/config.yaml — prode-mundial-backend
+schema: spec-driven
+
+context: |
+  Tech stack: .NET 10 ASP.NET Core Web API, PostgreSQL 17 (Npgsql EF Core 10.0.2),
+    Docker Compose (Postgres + pgAdmin), Clean Architecture
+    (Domain → Application → Infrastructure → Presentation).
+  Architecture: Registration prode with Mercado Pago payments. Entity Registration
+    with status lifecycle (Pending→Paid→Rejected→InReview→PaidWithoutNotification→Notified).
+    Placeholder MercadoPagoService awaiting SDK integration.
+  Testing: xUnit v2.9.3 + Moq v4.20.72 + EF Core InMemory + coverlet v6.0.4.
+    WARNING: InMemory version 10.0.0-preview.3 mismatches runtime EF Core 10.0.3 — all 7 tests fail.
+  Style: Primary constructors, file-scoped namespaces, nullable enabled, implicit usings.
+
+strict_tdd: true
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing Clean Architecture layering (Domain → Application → Infrastructure → Presentation)
+    - Keep new code compatible with nullable reference types and implicit usings
+    tdd: true
+    test_command: dotnet test tests/Api.Tests/Api.Tests.csproj --nologo -v q
+  verify:
+    test_command: dotnet test tests/Api.Tests/Api.Tests.csproj --nologo -v q
+    build_command: dotnet build Api-Prode-Mundial.sln --nologo -v q
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

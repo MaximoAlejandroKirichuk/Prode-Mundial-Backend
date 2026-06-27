@@ -12,4 +12,7 @@ public sealed class CreateRegistrationRequest
     [EmailAddress]
     [MaxLength(320)]
     public string Email { get; init; } = string.Empty;
+
+    [Required]
+    public Guid TournamentId { get; init; }
 }

@@ -3,28 +3,60 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Infrastructure.Payments;
 
-/// <summary>
-/// Placeholder Mercado Pago service ready for SDK replacement.
-/// Throws <see cref="NotSupportedException"/> until a real access token is configured.
-/// Provides the shape expected by the application layer so DI and tests work immediately.
-/// </summary>
-public sealed class MercadoPagoService(IOptions<MercadoPagoOptions> options) : IMercadoPagoService
+public sealed class MercadoPagoService : IMercadoPagoService
 {
-    private readonly MercadoPagoOptions _options = options.Value;
+    private readonly IMercadoPagoApi _api;
 
-    public Task<CreatePaymentPreferenceResult> CreatePreferenceAsync(
+    /// <summary>
+    /// Production constructor — wires the real Mercado Pago SDK.
+    /// </summary>
+    public MercadoPagoService(IOptions<MercadoPagoOptions> options)
+        : this(new MercadoPagoApi(options))
+    {
+    }
+
+    /// <summary>
+    /// Internal constructor for unit testing with a mocked <see cref="IMercadoPagoApi"/>.
+    /// </summary>
+    internal MercadoPagoService(IMercadoPagoApi api)
+    {
+        _api = api;
+    }
+
+    public async Task<CreatePaymentPreferenceResult> CreatePreferenceAsync(
         string name,
         string email,
+        decimal amount,
+        string currency,
         string externalReference,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.AccessToken))
-        {
-            throw new NotSupportedException(
-                "Mercado Pago is not configured. Set MercadoPago:AccessToken in configuration to enable real payment integration.");
-        }
+        var tournamentRegistrationTitle = $"Tournament registration — {name}";
 
-        throw new NotImplementedException(
-            "MercadoPagoService SDK integration is not yet implemented. Replace this placeholder with the MercadoPago SDK.");
+        var preference = await _api.CreatePreferenceAsync(
+            tournamentRegistrationTitle,
+            unitPrice: amount,
+            currency: currency,
+            externalReference,
+            cancellationToken);
+
+        return new CreatePaymentPreferenceResult(
+            PreferenceId: preference.PreferenceId,
+            PaymentUrl: preference.InitPoint);
+    }
+
+    public async Task<MercadoPagoPayment> GetPaymentAsync(
+        long paymentId,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _api.GetPaymentAsync(paymentId, cancellationToken);
+
+        return new MercadoPagoPayment(
+            response.PaymentId,
+            response.Status,
+            response.Amount,
+            response.Currency,
+            response.ExternalReference,
+            response.CreatedAt);
     }
 }
