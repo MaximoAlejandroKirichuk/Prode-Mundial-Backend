@@ -16,6 +16,25 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ??
+    [
+        "https://prode-mundial-lito.netlify.app",
+        "http://localhost:4321"
+    ];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 // Persistence
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Database=ProdeMundial;Username=postgres;Password=postgres;";
@@ -87,6 +106,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseHttpsRedirection();
 }
+app.UseCors("Frontend");
 app.UseAuthorization();
 app.MapControllers();
 
