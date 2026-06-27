@@ -13,6 +13,12 @@ public sealed class TournamentRepository(AppDbContext context) : ITournamentRepo
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
+    public async Task<Tournament?> GetActiveAsync(CancellationToken cancellationToken = default)
+    {
+        return await context.Tournaments
+            .FirstOrDefaultAsync(t => t.Active, cancellationToken);
+    }
+
     public async Task<bool> IsActiveAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await context.Tournaments

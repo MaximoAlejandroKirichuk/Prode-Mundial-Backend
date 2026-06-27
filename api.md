@@ -1,19 +1,61 @@
 # API frontend guide
 
-This backend currently exposes the registration checkout endpoint at **`POST /api/registrations`**.
+This backend exposes two public endpoints:
 
-It is the endpoint the Astro landing page should call to start the Mercado Pago flow.
+- **`GET /api/tournaments/active`** — returns the current active tournament for the landing page.
+- **`POST /api/registrations`** — starts the Mercado Pago checkout flow.
 
 ## Quick path
 
-1. Send `name`, `email`, and `tournamentId` to `POST /api/registrations`.
-2. If the request is valid, the API returns a Mercado Pago URL in `paymentUrl`.
-3. Redirect the user to that URL.
-4. The backend later processes the Mercado Pago webhook server-to-server.
+1. On page load, call `GET /api/tournaments/active` to get the current tournament.
+2. Send `name`, `email`, and `tournamentId` to `POST /api/registrations`.
+3. If the request is valid, the API returns a Mercado Pago URL in `paymentUrl`.
+4. Redirect the user to that URL.
+5. The backend later processes the Mercado Pago webhook server-to-server.
 
 ---
 
-## 1) Checkout endpoint
+## 1) Active tournament endpoint
+
+### Route
+
+`GET /api/tournaments/active`
+
+### Description
+
+Returns the single active tournament. The frontend should call this on page load to display tournament details (name, price) and obtain the `tournamentId` needed for registration.
+
+### Success response
+
+**Status:** `200 OK`
+
+```json
+{
+  "tournamentId": "11111111-2222-3333-4444-555555555555",
+  "name": "Prode Mundial 2026",
+  "priceAmount": 5000,
+  "currency": "ARS"
+}
+```
+
+### Response fields
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `tournamentId` | guid | Unique tournament identifier |
+| `name` | string | Display name |
+| `priceAmount` | decimal | Registration price |
+| `currency` | string | ISO 4217 currency code (e.g. `ARS`) |
+
+### Not found response
+
+**Status:** `404 Not Found`
+
+No body. Frontend should display a message like "No hay torneo activo en este momento."
+
+---
+
+## 2) Checkout endpoint
 
 ### Route
 
@@ -61,7 +103,7 @@ The API also returns a `Location` header pointing to `/api/registrations/{regist
 
 ---
 
-## 2) Business rules the frontend must know
+## 3) Business rules the frontend must know
 
 ### Tournament validation
 
@@ -86,7 +128,7 @@ The frontend should clearly tell the user:
 
 ---
 
-## 3) Error responses
+## 4) Error responses
 
 The controller returns `ProblemDetails` for business or validation errors.
 
@@ -135,7 +177,7 @@ Used for unexpected server-side failures.
 
 ---
 
-## 4) Frontend integration behavior
+## 5) Frontend integration behavior
 
 ### Recommended UX flow
 
@@ -156,7 +198,7 @@ If the response returns `isExisting: true`, frontend should keep the same behavi
 
 ---
 
-## 5) What the backend does after payment
+## 6) What the backend does after payment
 
 This part is server-to-server, but frontend should know the outcome model.
 
@@ -169,7 +211,7 @@ This part is server-to-server, but frontend should know the outcome model.
 
 ---
 
-## 6) Important notes
+## 7) Important notes
 
 - The public checkout route is currently **`/api/registrations`**, not `/api/inscripciones`.
 - `paymentUrl` is the field the frontend should use for redirect.
@@ -178,7 +220,24 @@ This part is server-to-server, but frontend should know the outcome model.
 
 ---
 
-## 7) Example fetch
+## 8) Example fetch
+
+### Get active tournament
+
+```ts
+const response = await fetch("/api/tournaments/active");
+
+if (response.ok) {
+  const tournament = await response.json();
+  // tournament.tournamentId, tournament.name, tournament.priceAmount, tournament.currency
+}
+
+if (response.status === 404) {
+  // No active tournament — show appropriate message
+}
+```
+
+### Register for tournament
 
 ```ts
 const response = await fetch("/api/registrations", {
