@@ -2,3 +2,15 @@ bin/
 obj/
 .vs/
 .idea/
+*.user
+*.suo
+*.cache
+*.Cache
+project.lock.json
+*.nuget.props
+*.nuget.targets
+
+# Environment secrets
+.env
+.env.*
+!.env.example

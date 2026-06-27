@@ -45,14 +45,48 @@ builder.Services.AddScoped<ProcessMercadoPagoWebhookUseCase>();
 
 var app = builder.Build();
 
+// ---- Database migration (bounded retry for Render cold starts) ----
+{
+    const int maxAttempts = 5;
+    Exception? lastException = null;
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.Migrate();
+            logger.LogInformation("Database migration succeeded on attempt {Attempt}", attempt);
+            lastException = null;
+            break;
+        }
+        catch (Exception ex)
+        {
+            lastException = ex;
+            var delaySeconds = (int)Math.Pow(2, attempt);
+            logger.LogWarning(ex, "Migration attempt {Attempt}/{Max} failed; retrying in {Delay}s", attempt, maxAttempts, delaySeconds);
+
+            if (attempt < maxAttempts)
+                await Task.Delay(delaySeconds * 1000);
+        }
+    }
+
+    if (lastException is not null)
+    {
+        logger.LogError(lastException, "All {Max} migration attempts failed; aborting startup", maxAttempts);
+        throw lastException;
+    }
+}
+
 // ---- Middleware ----
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseHttpsRedirection();
 }
-
-app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 
