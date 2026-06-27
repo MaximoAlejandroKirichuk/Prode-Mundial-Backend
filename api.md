@@ -34,12 +34,14 @@ It is the endpoint the Astro landing page should call to start the Mercado Pago 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `name` | string | Yes | Max 200 chars |
-| `email` | string | Yes | Must be a valid email |
+| `email` | string | Yes | Must be a valid email, max 320 chars |
 | `tournamentId` | guid | Yes | Comes from the landing |
 
 ### Success response
 
 **Status:** `201 Created`
+
+The API also returns a `Location` header pointing to `/api/registrations/{registrationId}`.
 
 ```json
 {
@@ -55,7 +57,7 @@ It is the endpoint the Astro landing page should call to start the Mercado Pago 
 |-------|------|---------|
 | `registrationId` | guid | Internal registration id |
 | `paymentUrl` | string | Mercado Pago checkout URL (`init_point`) |
-| `isExisting` | bool | `true` if the API reused a recent pending checkout |
+| `isExisting` | bool | `true` if the API reused a recent pending checkout; frontend should still redirect to `paymentUrl` |
 
 ---
 
@@ -88,13 +90,20 @@ The frontend should clearly tell the user:
 
 The controller returns `ProblemDetails` for business or validation errors.
 
+### `400 Bad Request`
+
+Used when:
+
+- the JSON body is malformed
+- a field type is invalid (for example, `tournamentId` is not a valid GUID format)
+
 ### `422 Unprocessable Entity`
 
 Used when:
 
 - required fields are missing
 - email format is invalid
-- `tournamentId` is missing or invalid
+- `tournamentId` is missing or empty
 - tournament does not exist
 - tournament is inactive
 
@@ -120,6 +129,10 @@ Typical title:
 
 - `Service Unavailable`
 
+### `500 Internal Server Error`
+
+Used for unexpected server-side failures.
+
 ---
 
 ## 4) Frontend integration behavior
@@ -131,6 +144,8 @@ Typical title:
 3. Frontend calls `POST /api/registrations`.
 4. If success, frontend redirects to `paymentUrl`.
 5. Frontend should not try to confirm payment itself; payment confirmation is handled by the backend webhook.
+
+If the response returns `isExisting: true`, frontend should keep the same behavior and redirect to the returned `paymentUrl`.
 
 ### Recommended frontend messages
 
@@ -146,6 +161,7 @@ Typical title:
 This part is server-to-server, but frontend should know the outcome model.
 
 - Mercado Pago calls the backend webhook.
+- Webhook endpoint: `POST /api/mercadopago/webhook`.
 - The backend validates the payment and avoids processing duplicates.
 - If payment is approved and consistent, the backend marks the registration as paid.
 - Then it tries to send the access email.
