@@ -1,0 +1,59 @@
+Actores del Sistema
+Participante El usuario que quiere jugar al Prode.
+Mercado Pago (MP) El sistema externo que procesa la plata y nos notifica.
+Sistema (Backend) Tu API en ASP.NET Core orquestando la base de datos y los correos.
+CU-01 Iniciar Inscripción al Prode
+Actor Participante Descripción El participante ingresa sus datos básicos para generar la intención de pago.
+Flujo principal
+El Participante ingresa a la Landing Page (Astro) y completa el formulario con Nombre y Correo Electrónico.
+Hace clic en Pagar Inscripción.
+El frontend envía un POST a tu API con esos datos.
+Tu API crea un nuevo registro en la base de datos (SQL Server) con el estado Pendiente.
+Tu API se comunica con el SDK de Mercado Pago para generar una Preferencia de Pago, inyectando el ID del registro (o el mail) en el campo external_reference.
+La API devuelve el link de pago (init_point) al frontend.
+Astro redirige al Participante a la pantalla segura de Mercado Pago.
+
+Edge Case 1 El usuario hace doble clic compulsivo en el botón de pago.
+El problema Astro dispara tres peticiones POST a tu API en un segundo. Creás tres registros pendientes y tres preferencias de Mercado Pago distintas.
+La solución En el frontend (Astro), deshabilitar el botón y mostrar un spinner (Generando pago...) apenas se hace el primer clic. En el backend, podés agregar una validación rápida si ya existe un registro Pendiente para ese mismo correo creado hace menos de 5 minutos, devolverle el link de pago que ya se había generado en lugar de crear uno nuevo.
+Edge Case 2 El usuario ingresa mal su correo (Ej juan@gmai.com).
+El problema Todo el flujo funciona, Mercado Pago cobra la plata, pero el correo rebota y el usuario nunca recibe el link.
+La solución Astro debe requerir ingresar el correo dos veces (Confirmar Email) para evitar errores de tipeo.
+Edge Case 3 La API de Mercado Pago se cae o da timeout.
+El problema Tu API intenta crear la preferencia pero Mercado Pago devuelve un error 500.
+La solución Tu backend debe capturar la excepción y devolverle a Astro un mensaje claro Mercado Pago está experimentando demoras. Por favor, intentá de nuevo en unos minutos. No guardes el registro como Pendiente si no lograste obtener el init_point.
+
+CU-02 Procesar y Validar el Pago (Idempotencia)
+Actor Mercado Pago Descripción El sistema recibe la notificación asíncrona de que hubo un movimiento de plata y valida su veracidad.
+Flujo principal
+Mercado Pago dispara un POST (Webhook) hacia tu endpoint apiwebhook enviando un ID de transacción.
+Tu API recibe el ID y consulta inmediatamente en la base de datos si ese pago ya fue procesado. (Esto evita el problema de los webhooks repetidos).
+Si ya fue procesado, la API devuelve un 200 OK y corta la ejecución.
+Si es nuevo, la API consulta al SDK de Mercado Pago el estado real de ese ID.
+Si el estado es approved, la API actualiza el registro en la base de datos cambiando el estado de Pendiente a Pagado.
+
+
+Edge Case 1 Pagos en revisión o en efectivo (RapipagoPago Fácil).
+El problema Mercado Pago te manda el webhook, pero el estado del pago no es approved, sino in_process (tarjeta bajo revisión por fraude) o pending (eligieron pagar en efectivo y todavía no fueron al local).
+La solución Tu endpoint debe leer el status. Si es distinto de approved, actualizás la base de datos con ese estado (Ej En Revisión) pero cortás el flujo y no mandás el correo. Cuando se apruebe, Mercado Pago te va a mandar otro webhook avisando que cambió a approved.
+Edge Case 2 Pagos rechazados.
+El problema La tarjeta rechaza el pago por falta de fondos.
+La solución Actualizás tu base de datos a Rechazado para tener el registro, devolvés un 200 OK a Mercado Pago y no hacés nada más.
+Edge Case 3 Webhook huérfano (Condición de carrera).
+El problema Mercado Pago es tan rápido que te manda el Webhook de pago aprobado antes de que tu endpoint del CU-01 haya terminado de guardar el registro Pendiente en la base de datos (raro, pero pasa).
+La solución Si el Webhook busca el external_reference en tu base de datos y no lo encuentra, en lugar de dar error, debería reintentar la búsqueda tras unos segundos, o guardar ese webhook en una tabla de Webhooks sin procesar para revisarlo luego.
+CU-03 Entregar Acceso por Correo
+Actor Sistema (Se dispara automáticamente tras el éxito del CU-02) Descripción El sistema envía el enlace de acceso y deja registro de la entrega para soporte.
+Flujo principal
+Al marcar la inscripción como Pagada, el sistema toma el correo electrónico asociado a ese registro.
+Ejecuta una llamada HTTP al servicio transaccional (Ej Resend) con la plantilla del correo y el enlace al Prode.
+Si el servicio de correos responde con éxito, la API actualiza el registro en la base de datos a Notificado (o guarda un log de Correo Enviado).
+(Flujo Alternativo) Si el servicio de correos falla o da timeout, el estado queda en Pagado, lo que te permite a vos tirar un script manual después para reintentar el envío a todos los que quedaron estancados en ese estado.
+Edge Case 1 El servicio de correos (Resend) da error o timeout.
+El problema El pago está aprobado en MP y en tu base de datos, pero el HttpClient hacia la API de correos tira una excepción. El usuario se queda sin su link.
+La solución En tu bloque try-catch, si el envío falla, el registro en la base de datos debe quedar estrictamente como Pagado_Sin_Notificar. De esta forma, podés armar un background worker (o simplemente correr un script manual por consola al final del día) que busque todos los usuarios en ese estado y les reintente enviar el correo.
+Edge Case 2 La casilla del usuario está llena (Soft Bounce).
+El problema Resend acepta el envío (tu código marca Notificado), pero el proveedor del usuario rechaza el mensaje.
+La solución Técnicamente, esto requiere escuchar los webhooks del propio Resend. Para un proyecto de una semana, esto es sobreingeniería. La solución pragmática es poner un aviso grande en la Landing Page que diga Si no recibís el correo en 10 minutos, escribinos a [Email de Soporte] adjuntando tu comprobante de Mercado Pago.
+
+
