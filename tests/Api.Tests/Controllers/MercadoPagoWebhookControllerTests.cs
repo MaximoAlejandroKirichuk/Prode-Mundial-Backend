@@ -15,7 +15,7 @@ public sealed class MercadoPagoWebhookControllerTests
     public MercadoPagoWebhookControllerTests()
     {
         _useCaseMock = new Mock<ProcessMercadoPagoWebhookUseCase>(
-            null!, null!, null!, null!, null!, null!, null!);
+            null!, null!, null!, null!, null!, null!);
         _sut = new MercadoPagoWebhookController(_useCaseMock.Object);
     }
 

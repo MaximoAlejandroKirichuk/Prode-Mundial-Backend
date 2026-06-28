@@ -27,8 +27,7 @@ public class ProcessMercadoPagoWebhookUseCase(
     IWebhookIdempotencyRepository idempotencyRepository,
     IRegistrationPaymentRepository paymentRepository,
     IRegistrationAnomalyRepository anomalyRepository,
-    IEmailService emailService,
-    string accessLinkTemplate)
+    IEmailService emailService)
 {
     private static readonly TimeSpan LateApprovalWindow = TimeSpan.FromHours(24);
     private static readonly TimeSpan StalePaymentThreshold = TimeSpan.FromDays(30);
@@ -322,13 +321,11 @@ public class ProcessMercadoPagoWebhookUseCase(
         // ---- Step 13: Attempt notification ----
         try
         {
-            var accessLink = accessLinkTemplate;
             var emailResult = await emailService.SendAccessEmailAsync(
                 registration.Email,
                 registration.Name,
                 tournament.Name,
                 paidAt,
-                accessLink,
                 cancellationToken);
 
             if (emailResult.Success)

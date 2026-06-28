@@ -7,7 +7,6 @@ public interface IEmailService
         string toName,
         string tournamentName,
         DateTimeOffset approvedAt,
-        string accessLink,
         CancellationToken cancellationToken = default);
 }
 

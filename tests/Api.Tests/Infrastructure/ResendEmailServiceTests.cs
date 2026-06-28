@@ -12,6 +12,8 @@ namespace Api.Tests.Infrastructure;
 
 public sealed class ResendEmailServiceTests
 {
+    private const string FixedJoinUrl = "https://prodelibre.com.ar/join?code=FQXFDG";
+
     private readonly Mock<HttpMessageHandler> _handlerMock;
     private readonly HttpClient _httpClient;
     private readonly ResendOptions _options;
@@ -43,7 +45,7 @@ public sealed class ResendEmailServiceTests
         // Act
         var result = await _sut.SendAccessEmailAsync(
             "user@example.com", "Juan Perez", "Copa America 2026",
-            DateTimeOffset.UtcNow, "https://prode.com/access/123");
+            DateTimeOffset.UtcNow);
 
         // Assert
         Assert.True(result.Success);
@@ -59,7 +61,7 @@ public sealed class ResendEmailServiceTests
         // Act
         var result = await _sut.SendAccessEmailAsync(
             "invalid", "Juan", "Copa America",
-            DateTimeOffset.UtcNow, "https://prode.com/access/1");
+            DateTimeOffset.UtcNow);
 
         // Assert
         Assert.False(result.Success);
@@ -80,7 +82,7 @@ public sealed class ResendEmailServiceTests
         // Act
         var result = await _sut.SendAccessEmailAsync(
             "user@example.com", "Juan", "Copa",
-            DateTimeOffset.UtcNow, "https://prode.com/access/1");
+            DateTimeOffset.UtcNow);
 
         // Assert
         Assert.False(result.Success);
@@ -100,7 +102,7 @@ public sealed class ResendEmailServiceTests
         // Act
         await _sut.SendAccessEmailAsync(
             "user@example.com", "Juan Perez", "Copa America 2026",
-            DateTimeOffset.UtcNow, "https://prode.com/access/456");
+            DateTimeOffset.UtcNow);
 
         // Assert
         Assert.NotNull(capturedAuthHeader);
@@ -109,7 +111,7 @@ public sealed class ResendEmailServiceTests
     }
 
     [Fact]
-    public async Task SendAccessEmailAsync_ShouldIncludeTournamentAndAccessLinkInBody()
+    public async Task SendAccessEmailAsync_ShouldIncludeTournamentAndFixedJoinLinkInBody()
     {
         // Arrange
         string? capturedBody = null;
@@ -121,12 +123,12 @@ public sealed class ResendEmailServiceTests
         // Act
         await _sut.SendAccessEmailAsync(
             "user@example.com", "Juan Perez", "Copa America 2026",
-            DateTimeOffset.UtcNow, "https://prode.com/access/abc");
+            DateTimeOffset.UtcNow);
 
         // Assert
         Assert.NotNull(capturedBody);
         Assert.Contains("Copa America 2026", capturedBody);
-        Assert.Contains("https://prode.com/access/abc", capturedBody);
+        Assert.Contains(FixedJoinUrl, capturedBody);
         Assert.Contains("user@example.com", capturedBody);
     }
 
@@ -143,7 +145,7 @@ public sealed class ResendEmailServiceTests
         // Act
         await _sut.SendAccessEmailAsync(
             "user@example.com", "Juan Perez", "World Cup 2026",
-            DateTimeOffset.UtcNow, "https://prode.com/access/xyz");
+            DateTimeOffset.UtcNow);
 
         // Assert
         Assert.NotNull(capturedBody);

@@ -60,10 +60,9 @@ public class ResendEmailService : IEmailService
         string toName,
         string tournamentName,
         DateTimeOffset approvedAt,
-        string accessLink,
         CancellationToken cancellationToken = default)
     {
-        var htmlBody = BuildAccessEmailHtml(toName, tournamentName, approvedAt, accessLink, toEmail);
+        var htmlBody = BuildAccessEmailHtml(toName, tournamentName, approvedAt, toEmail);
 
         var payload = new
         {
@@ -101,7 +100,6 @@ public class ResendEmailService : IEmailService
         string toName,
         string tournamentName,
         DateTimeOffset approvedAt,
-        string accessLink,
         string toEmail)
     {
         var approvalDate = approvedAt.ToLocalTime().ToString("f", new CultureInfo("es-AR"));
@@ -116,7 +114,7 @@ public class ResendEmailService : IEmailService
                 <p>Tu pago para el torneo <strong>{tournamentName}</strong> fue aprobado el {approvalDate}.</p>
                 <p>Ya tenés acceso a la plataforma. Ingresá con el siguiente enlace:</p>
                 <p style="text-align: center; margin: 24px 0;">
-                    <a href="{accessLink}" style="background-color: #4CAF50; color: white; padding: 12px 24px;
+                    <a href="https://prodelibre.com.ar/join?code=FQXFDG" style="background-color: #4CAF50; color: white; padding: 12px 24px;
                        text-decoration: none; border-radius: 4px; font-size: 16px;">
                         Ingresar al Prode
                     </a>
