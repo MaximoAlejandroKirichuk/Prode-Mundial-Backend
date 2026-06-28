@@ -27,7 +27,8 @@ public class ProcessMercadoPagoWebhookUseCase(
     IWebhookIdempotencyRepository idempotencyRepository,
     IRegistrationPaymentRepository paymentRepository,
     IRegistrationAnomalyRepository anomalyRepository,
-    IEmailService emailService)
+    IEmailService emailService,
+    string accessLinkTemplate)
 {
     private static readonly TimeSpan LateApprovalWindow = TimeSpan.FromHours(24);
     private static readonly TimeSpan StalePaymentThreshold = TimeSpan.FromDays(30);
@@ -321,7 +322,8 @@ public class ProcessMercadoPagoWebhookUseCase(
         // ---- Step 13: Attempt notification ----
         try
         {
-            var accessLink = $"https://prode.com/access/{registration.Id}";
+            var accessLink = accessLinkTemplate.Replace(
+                "{registrationId}", registration.Id.ToString());
             var emailResult = await emailService.SendAccessEmailAsync(
                 registration.Email,
                 registration.Name,

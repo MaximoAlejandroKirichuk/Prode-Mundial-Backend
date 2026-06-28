@@ -10,6 +10,8 @@ namespace Api.Tests.UseCases;
 
 public sealed class ProcessMercadoPagoWebhookUseCaseTests
 {
+    private const string AccessLinkTemplate = "https://example.com/access/{registrationId}";
+
     private readonly Mock<IMercadoPagoService> _mpServiceMock;
     private readonly Mock<IRegistrationRepository> _registrationRepoMock;
     private readonly Mock<IWebhookIdempotencyRepository> _idempotencyRepoMock;
@@ -38,7 +40,8 @@ public sealed class ProcessMercadoPagoWebhookUseCaseTests
             _idempotencyRepoMock.Object,
             _paymentRepoMock.Object,
             _anomalyRepoMock.Object,
-            _emailServiceMock.Object);
+            _emailServiceMock.Object,
+            AccessLinkTemplate);
 
         _tournamentId = Guid.NewGuid();
         _tournament = new Tournament("Copa America 2026", 1500m, "ARS");
@@ -527,6 +530,52 @@ public sealed class ProcessMercadoPagoWebhookUseCaseTests
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
             () => _sut.ExecuteAsync("payment", "not-a-number"));
+    }
+
+    // ====================================================================
+    // Access link template
+    // ====================================================================
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldUseAccessLinkTemplate_WhenSendingEmail()
+    {
+        // Arrange
+        var paymentId = "12345";
+        var now = DateTimeOffset.UtcNow;
+
+        _mpServiceMock
+            .Setup(m => m.GetPaymentAsync(12345L, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MercadoPagoPayment(
+                12345L, "approved", 1500m, "ARS",
+                _registrationId.ToString(), now));
+
+        _idempotencyRepoMock
+            .Setup(r => r.IsDuplicateAsync(paymentId, "approved", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        _registrationRepoMock
+            .Setup(r => r.GetByExternalReferenceAsync(_registrationId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateRegistrationWithTournament());
+
+        _emailServiceMock
+            .Setup(e => e.SendAccessEmailAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<DateTimeOffset>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmailSendResult(true));
+
+        // Act
+        var result = await _sut.ExecuteAsync("payment", paymentId);
+
+        // Assert: verify the access link was built from the template
+        _emailServiceMock.Verify(
+            e => e.SendAccessEmailAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<DateTimeOffset>(),
+                $"https://example.com/access/{_registrationId}",
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     // ====================================================================

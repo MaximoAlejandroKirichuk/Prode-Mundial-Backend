@@ -3,7 +3,9 @@ using Api.Application.Abstractions.Payments;
 using Api.Application.Abstractions.Persistence;
 using Api.Application.UseCases.Registrations;
 using Api.Application.UseCases.Webhooks;
+using Api.Application.Options;
 using Api.Infrastructure.Notifications;
+using Microsoft.Extensions.Options;
 using Api.Infrastructure.Payments;
 using Api.Infrastructure.Persistence;
 using Api.Infrastructure.Persistence.Repositories;
@@ -58,9 +60,20 @@ builder.Services.Configure<ResendOptions>(
     builder.Configuration.GetSection(ResendOptions.SectionName));
 builder.Services.AddScoped<IEmailService, ResendEmailService>();
 
+// Access Link
+builder.Services.Configure<AccessLinkOptions>(
+    builder.Configuration.GetSection(AccessLinkOptions.SectionName));
+
 // Use Cases
 builder.Services.AddScoped<CreateRegistrationUseCase>();
-builder.Services.AddScoped<ProcessMercadoPagoWebhookUseCase>();
+builder.Services.AddScoped(sp => new ProcessMercadoPagoWebhookUseCase(
+    sp.GetRequiredService<IMercadoPagoService>(),
+    sp.GetRequiredService<IRegistrationRepository>(),
+    sp.GetRequiredService<IWebhookIdempotencyRepository>(),
+    sp.GetRequiredService<IRegistrationPaymentRepository>(),
+    sp.GetRequiredService<IRegistrationAnomalyRepository>(),
+    sp.GetRequiredService<IEmailService>(),
+    sp.GetRequiredService<IOptions<AccessLinkOptions>>().Value.Template));
 
 var app = builder.Build();
 
