@@ -322,8 +322,7 @@ public class ProcessMercadoPagoWebhookUseCase(
         // ---- Step 13: Attempt notification ----
         try
         {
-            var accessLink = accessLinkTemplate.Replace(
-                "{registrationId}", registration.Id.ToString());
+            var accessLink = accessLinkTemplate;
             var emailResult = await emailService.SendAccessEmailAsync(
                 registration.Email,
                 registration.Name,

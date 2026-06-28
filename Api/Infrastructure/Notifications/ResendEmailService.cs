@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -103,7 +104,7 @@ public class ResendEmailService : IEmailService
         string accessLink,
         string toEmail)
     {
-        var approvalDate = approvedAt.ToLocalTime().ToString("f");
+        var approvalDate = approvedAt.ToLocalTime().ToString("f", new CultureInfo("es-AR"));
 
         return $"""
             <!DOCTYPE html>
@@ -126,6 +127,9 @@ public class ResendEmailService : IEmailService
                 <p style="color: #666; font-size: 14px;">
                     ¿Problemas para ingresar? Verificá que estés usando <strong>{toEmail}</strong> como correo
                     de acceso. Si el problema persiste, contactá a nuestro equipo de soporte respondiendo este mensaje.
+                </p>
+                <p style="color: #666; font-size: 14px;">
+                    ¿Necesitás ayuda? <a href="mailto:oficialprodelito@gmail.com">oficialprodelito@gmail.com</a>
                 </p>
             </body>
             </html>

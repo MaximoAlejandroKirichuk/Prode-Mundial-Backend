@@ -10,7 +10,7 @@ namespace Api.Tests.UseCases;
 
 public sealed class ProcessMercadoPagoWebhookUseCaseTests
 {
-    private const string AccessLinkTemplate = "https://example.com/access/{registrationId}";
+    private const string AccessLinkTemplate = "https://prodelibre.com.ar/join?code=FQXFDG";
 
     private readonly Mock<IMercadoPagoService> _mpServiceMock;
     private readonly Mock<IRegistrationRepository> _registrationRepoMock;
@@ -566,14 +566,14 @@ public sealed class ProcessMercadoPagoWebhookUseCaseTests
         // Act
         var result = await _sut.ExecuteAsync("payment", paymentId);
 
-        // Assert: verify the access link was built from the template
+        // Assert: verify the access link is the fixed shared URL
         _emailServiceMock.Verify(
             e => e.SendAccessEmailAsync(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<DateTimeOffset>(),
-                $"https://example.com/access/{_registrationId}",
+                AccessLinkTemplate,
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }

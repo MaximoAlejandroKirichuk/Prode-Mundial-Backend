@@ -149,6 +149,8 @@ public sealed class ResendEmailServiceTests
         Assert.NotNull(capturedBody);
         Assert.Contains("soporte", capturedBody, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("mismo correo", capturedBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("oficialprodelito@gmail.com", capturedBody);
+        Assert.Contains("ayuda", capturedBody, StringComparison.OrdinalIgnoreCase);
     }
 
     // ---- Helpers ----
