@@ -12,10 +12,23 @@ internal sealed class MercadoPagoApi : IMercadoPagoApi
     // The Mercado Pago SDK uses a static AccessToken property for configuration.
     // ReSharper disable once PrivateFieldCanBeConvertedToLocalVariable
     private readonly MercadoPagoOptions _options;
+    private readonly IPreferenceClient _preferenceClient;
 
+    /// <summary>
+    /// Production constructor — wires the real Mercado Pago SDK.
+    /// </summary>
     public MercadoPagoApi(IOptions<MercadoPagoOptions> options)
+        : this(options, new SdkPreferenceClient())
+    {
+    }
+
+    /// <summary>
+    /// Internal constructor for unit testing with a mocked <see cref="IPreferenceClient"/>.
+    /// </summary>
+    internal MercadoPagoApi(IOptions<MercadoPagoOptions> options, IPreferenceClient preferenceClient)
     {
         _options = options.Value;
+        _preferenceClient = preferenceClient;
         MercadoPagoConfig.AccessToken = _options.AccessToken;
     }
 
@@ -39,13 +52,32 @@ internal sealed class MercadoPagoApi : IMercadoPagoApi
                 }
             ],
             ExternalReference = externalReference,
-            NotificationUrl = null // configure via MercadoPago dashboard or env
+            NotificationUrl = null, // configure via MercadoPago dashboard or env
+            BackUrls = BuildBackUrls(),
+            AutoReturn = _options.AutoReturn
         };
 
-        var client = new PreferenceClient();
-        Preference preference = await client.CreateAsync(request, cancellationToken: cancellationToken);
+        Preference preference = await _preferenceClient.CreateAsync(request, cancellationToken: cancellationToken);
 
         return new CreatePreferenceResponse(preference.Id!, preference.InitPoint!);
+    }
+
+    private PreferenceBackUrlsRequest? BuildBackUrls()
+    {
+        var backUrls = _options.BackUrls;
+        if (backUrls is null)
+            return null;
+
+        // Return null if none of the URLs are configured — MP SDK treats null as "no back URLs"
+        if (backUrls.Success is null && backUrls.Failure is null && backUrls.Pending is null)
+            return null;
+
+        return new PreferenceBackUrlsRequest
+        {
+            Success = backUrls.Success,
+            Failure = backUrls.Failure,
+            Pending = backUrls.Pending
+        };
     }
 
     public async Task<MercadoPagoPaymentResponse> GetPaymentAsync(

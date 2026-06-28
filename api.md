@@ -12,6 +12,7 @@ This backend exposes two public endpoints:
 3. If the request is valid, the API returns a Mercado Pago URL in `paymentUrl`.
 4. Redirect the user to that URL.
 5. The backend later processes the Mercado Pago webhook server-to-server.
+6. After Mercado Pago returns the browser, the frontend should show a status page and treat the webhook as the source of truth.
 
 ---
 
@@ -101,6 +102,30 @@ The API also returns a `Location` header pointing to `/api/registrations/{regist
 | `paymentUrl` | string | Mercado Pago checkout URL (`init_point`) |
 | `isExisting` | bool | `true` if the API reused a recent pending checkout; frontend should still redirect to `paymentUrl` |
 
+### Mercado Pago browser return
+
+The backend now configures Mercado Pago preference return URLs:
+
+- `success` → frontend route for approved browser return
+- `failure` → frontend route for failed or cancelled browser return
+- `pending` → frontend route for pending browser return
+- `auto_return` → `approved`
+
+Recommended frontend routes:
+
+- `/pago/exito`
+- `/pago/error`
+- `/pago/pendiente`
+
+Mercado Pago usually returns query params such as:
+
+- `payment_id`
+- `status`
+- `merchant_order_id`
+- `preference_id`
+
+The frontend may read those params for display, but must not treat them as final payment confirmation.
+
 ---
 
 ## 3) Business rules the frontend must know
@@ -186,6 +211,7 @@ Used for unexpected server-side failures.
 3. Frontend calls `POST /api/registrations`.
 4. If success, frontend redirects to `paymentUrl`.
 5. Frontend should not try to confirm payment itself; payment confirmation is handled by the backend webhook.
+6. When Mercado Pago redirects the browser back to `/pago/exito`, `/pago/error`, or `/pago/pendiente`, the frontend should show a user-friendly state page and explain that final confirmation depends on the backend webhook, not only on the browser return.
 
 If the response returns `isExisting: true`, frontend should keep the same behavior and redirect to the returned `paymentUrl`.
 
@@ -204,6 +230,7 @@ This part is server-to-server, but frontend should know the outcome model.
 
 - Mercado Pago calls the backend webhook.
 - Webhook endpoint: `POST /api/mercadopago/webhook`.
+- The checkout browser return is only UX navigation, not authoritative payment confirmation.
 - The backend validates the payment and avoids processing duplicates.
 - If payment is approved and consistent, the backend marks the registration as paid.
 - Then it tries to send the access email.
@@ -217,6 +244,7 @@ This part is server-to-server, but frontend should know the outcome model.
 - `paymentUrl` is the field the frontend should use for redirect.
 - `tournamentId` must come from the landing.
 - The backend, not the frontend, is responsible for webhook reconciliation and access email delivery.
+- Browser return pages (`/pago/exito`, `/pago/error`, `/pago/pendiente`) are UX routes only. Final payment state belongs to the backend webhook flow.
 
 ---
 
