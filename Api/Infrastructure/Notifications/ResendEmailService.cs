@@ -9,6 +9,9 @@ namespace Api.Infrastructure.Notifications;
 
 public class ResendEmailService : IEmailService
 {
+    private static readonly TimeZoneInfo ArgentinaTimeZone =
+        ResolveArgentinaTimeZone();
+
     private readonly HttpClient _httpClient;
     private readonly ResendOptions _options;
 
@@ -102,7 +105,8 @@ public class ResendEmailService : IEmailService
         DateTimeOffset approvedAt,
         string toEmail)
     {
-        var approvalDate = approvedAt.ToLocalTime().ToString("f", new CultureInfo("es-AR"));
+        var argentinaTime = TimeZoneInfo.ConvertTimeFromUtc(approvedAt.UtcDateTime, ArgentinaTimeZone);
+        var approvalDate = argentinaTime.ToString("f", new CultureInfo("es-AR"));
 
         return $"""
             <!DOCTYPE html>
@@ -111,7 +115,7 @@ public class ResendEmailService : IEmailService
             <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h2>¡Pago aprobado!</h2>
                 <p>Hola {toName},</p>
-                <p>Tu pago para el torneo <strong>{tournamentName}</strong> fue aprobado el {approvalDate}.</p>
+                <p>Tu pago para el torneo <strong>{tournamentName}</strong> fue aprobado el {approvalDate} (hora de Argentina).</p>
                 <p>Ya tenés acceso a la plataforma. Ingresá con el siguiente enlace:</p>
                 <p style="text-align: center; margin: 24px 0;">
                     <a href="https://prodelibre.com.ar/join?code=FQXFDG" style="background-color: #4CAF50; color: white; padding: 12px 24px;
@@ -132,5 +136,31 @@ public class ResendEmailService : IEmailService
             </body>
             </html>
             """;
+    }
+
+    private static TimeZoneInfo ResolveArgentinaTimeZone()
+    {
+        var candidates = new[]
+        {
+            "Argentina Standard Time",
+            "America/Argentina/Buenos_Aires"
+        };
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(candidate);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        throw new TimeZoneNotFoundException(
+            "Could not resolve the Argentina time zone on this host.");
     }
 }

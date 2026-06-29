@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -153,6 +154,32 @@ public sealed class ResendEmailServiceTests
         Assert.Contains("mismo correo", capturedBody, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("oficialprodelito@gmail.com", capturedBody);
         Assert.Contains("ayuda", capturedBody, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SendAccessEmailAsync_ShouldRenderArgentinaTime_NotServerLocalTime()
+    {
+        // Arrange: 2026-06-15 18:30:00 UTC == 2026-06-15 15:30:00 ART (UTC-3)
+        var utcApprovedAt = new DateTimeOffset(2026, 6, 15, 18, 30, 0, TimeSpan.Zero);
+        var expectedArgentinaTime = new DateTime(2026, 6, 15, 15, 30, 0);
+
+        string? capturedBody = null;
+        SetupHandlerCapture(request =>
+        {
+            capturedBody = request.Content?.ReadAsStringAsync().Result;
+        }, HttpStatusCode.OK, "{\"id\":\"email-005\"}");
+
+        // Act
+        await _sut.SendAccessEmailAsync(
+            "user@example.com", "Juan Perez", "Copa America 2026",
+            utcApprovedAt);
+
+        // Assert: the rendered string must reflect Argentina wall-clock time
+        Assert.NotNull(capturedBody);
+        var argentinaCulture = new CultureInfo("es-AR");
+        var expectedPart = expectedArgentinaTime.ToString("f", argentinaCulture);
+        Assert.Contains(expectedPart, capturedBody);
+        Assert.Contains("(hora de Argentina)", capturedBody);
     }
 
     // ---- Helpers ----
